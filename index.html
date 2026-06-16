@@ -42,6 +42,10 @@
   .countdown-bar { height: 3px; border-radius: 2px; width: 100%; }
   .countdown-bar.correct { background: #3B6D11; }
   .countdown-bar.wrong { background: #A32D2D; }
+  .timer-bar-wrap { height: 6px; background: #2c2c2e; border-radius: 3px; margin-bottom: 12px; overflow: hidden; }
+  .timer-bar { height: 6px; border-radius: 3px; width: 100%; transition: width linear; background: #3B6D11; }
+  .timer-bar.warning { background: #BA7517; }
+  .timer-bar.danger { background: #A32D2D; }
   .level-up-banner { background: #1a3a1a; border: 0.5px solid #3B6D11; border-radius: 12px; padding: 12px; text-align: center; color: #7ddb7d; font-size: 14px; font-weight: 600; margin-bottom: 12px; display: none; }
   .result-emoji { font-size: 56px; text-align: center; margin-bottom: 8px; }
   .result-title { font-size: 22px; font-weight: 600; text-align: center; margin-bottom: 4px; }
@@ -100,6 +104,7 @@
       <span class="life" id="life-0">❤️</span><span class="life" id="life-1">❤️</span><span class="life" id="life-2">❤️</span>
     </div>
     <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%;background:#3B6D11"></div></div>
+    <div class="timer-bar-wrap"><div class="timer-bar" id="timer-bar"></div></div>
     <div id="level-up-banner" class="level-up-banner"></div>
     <div class="card question-box">
       <div id="flag-display"></div>
@@ -189,6 +194,9 @@ const WAVES = [
 ];
 
 const MAX_LIVES=3, Q_PER_WAVE=10, PAUSE_CORRECT=1000, PAUSE_WRONG=2000;
+const QUESTION_TIME = 10000; // 10 seconds per question
+let timerInterval = null;
+let timerStart = null;
 let currentPlayer = '';
 let leaderboardData = [];
 let advanceTimer = null;
@@ -270,6 +278,63 @@ function makeQuestion(country, idx, pool) {
 }
 function buildWaveQ(wi) { return shuffle(WAVES[wi].countries).slice(0,Q_PER_WAVE).map((c,i)=>makeQuestion(c,i,WAVES[wi].countries)); }
 function renderLives() { for(let i=0;i<MAX_LIVES;i++) document.getElementById('life-'+i).classList.toggle('lost',i>=state.lives); }
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  const bar = document.getElementById('timer-bar');
+  if (bar) { bar.style.transition = 'none'; bar.style.width = '100%'; bar.className = 'timer-bar'; }
+}
+
+function startTimer() {
+  stopTimer();
+  timerStart = Date.now();
+  const bar = document.getElementById('timer-bar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    bar.className = 'timer-bar';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = `width ${QUESTION_TIME}ms linear`;
+      bar.style.width = '0%';
+    }));
+  }
+  timerInterval = setInterval(() => {
+    const elapsed = Date.now() - timerStart;
+    const remaining = QUESTION_TIME - elapsed;
+    const bar = document.getElementById('timer-bar');
+    if (bar) {
+      const pct = (remaining / QUESTION_TIME) * 100;
+      if (pct < 25) bar.className = 'timer-bar danger';
+      else if (pct < 50) bar.className = 'timer-bar warning';
+    }
+    if (remaining <= 0) {
+      clearInterval(timerInterval); timerInterval = null;
+      timeOut();
+    }
+  }, 100);
+}
+
+function timeOut() {
+  if (state.answered) return;
+  state.answered = true;
+  state.streak = 0; state.errors++; state.lives--; renderLives();
+  document.querySelectorAll('.answer-btn').forEach(b => {
+    b.disabled = true;
+    if (b.dataset.val === state.wavePool[state.qInWave].correct) b.classList.add('correct');
+  });
+  const isGameOver = state.lives <= 0;
+  const suffix = isGameOver ? ' — Game over!' : state.lives === 1 ? ' — Last life!' : `  — ${state.lives} lives left`;
+  const q = state.wavePool[state.qInWave];
+  const correctOpt = q.options.find(o => o.value === q.correct);
+  const fb = document.getElementById('feedback-bar');
+  fb.className = 'feedback-bar wrong';
+  fb.innerHTML = `⏱ Time\'s up! — ${correctOpt ? correctOpt.label : q.correct}${suffix}<div class="countdown-bar-wrap"><div class="countdown-bar wrong" id="countdown-bar"></div></div>`;
+  const bar = document.getElementById('timer-bar');
+  if (bar) { bar.style.transition = 'none'; bar.style.width = '0%'; bar.className = 'timer-bar danger'; }
+  document.getElementById('score-display').textContent = state.score;
+  document.getElementById('streak-display').textContent = state.streak;
+  advanceTimer = setTimeout(isGameOver ? endGame : nextStep, PAUSE_WRONG);
+}
 
 function renderQuestion() {
   if(advanceTimer){clearTimeout(advanceTimer);advanceTimer=null;}
