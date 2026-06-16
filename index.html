@@ -262,7 +262,7 @@ function makeQuestion(country, idx, pool) {
   const others = getRandOthers(country.code, pool);
   const allOpts = shuffle([country,...others]);
   const q = {type, correct: country.code};
-  if(type==='cap-country') { q.question=`Which country has its capital in ${country.cap}?`; q.showFlag=null; q.options=allOpts.map(o=>({label:o.c,value:o.code,kind:'text'})); }
+  if(type==='cap-country') { q.question=`${country.cap} is the capital of which country?`; q.showFlag=null; q.options=allOpts.map(o=>({label:o.c,value:o.code,kind:'text'})); }
   else if(type==='country-cap') { q.question=`What is the capital of ${country.c}?`; q.showFlag=null; q.options=allOpts.map(o=>({label:o.cap,value:o.code,kind:'text'})); }
   else if(type==='flag-country') { q.question='Which country does this flag belong to?'; q.showFlag=country.code; q.options=allOpts.map(o=>({label:o.c,value:o.code,kind:'text'})); }
   else { q.question=`Which flag belongs to ${country.c}?`; q.showFlag=null; q.options=allOpts.map(o=>({label:o.c,value:o.code,kind:'flag'})); }
